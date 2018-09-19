@@ -16,7 +16,6 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     let baseURL = "https://apiv2.bitcoinaverage.com/indices/global/ticker/BTC"
     let API_KEY = ""
     let publicKey = "MGY2MzhiYzgwZjcwNGU3ZDlhMTdjNDdlMzY0YTk5ODQ"
-    let privateKey = "YmU1ZjgxMmVjNTU2NGRiNThiN2QyMDQ4NjkzMjI2MmE4Y2UyMDA0MGFjNWQ0OTczYTQ3NDY2MTYzMGQyOThlMQ"
     var finalURL = ""
     
     // MARK: - Variables
