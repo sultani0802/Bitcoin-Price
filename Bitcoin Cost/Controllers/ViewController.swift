@@ -20,6 +20,7 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     
     // MARK: - Variables
     let currencyArray = ["AUD", "BRL","CAD","CNY","EUR","GBP","HKD","IDR","ILS","INR","JPY","MXN","NOK","NZD","PLN","RON","RUB","SEK","SGD","USD","ZAR"]
+    let currencySymbolsArray = ["$", "R$", "$", "¥", "€", "£", "$", "Rp", "₪", "₹", "¥", "$", "kr", "$", "zł", "lei", "₽", "kr", "$", "$", "R"]
     
     // MARK: - IB Outlets
     @IBOutlet weak var priceLabel: UILabel!
@@ -32,19 +33,45 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
         
         currencyPickerView.delegate = self
         currencyPickerView.dataSource = self
+        
+        getBitcoinAuth()
     }
     
     // MARK: - Networking
-    func getBitcoinPrice(url: String) {
+    // This method fetches the price of 1 Bitcoin based on the currency chosen in the picker view
+    func getBitcoinPrice(url: String, symbol: Int) {
         Alamofire.request(url, method: .get)
             .responseJSON { response in
                 if response.result.isSuccess {
-                    // Do stuff with the data
                     let bitcoinJSON : JSON = JSON(response.result.value!) // Create a JSON object from the result
                     
+                    self.parseJSONData(json: bitcoinJSON, symbol: symbol) // Handle the JSON object
+                } else {
+                    // We couldn't connect to the bitcoin endpoint
+                    print("Error connecting to Bitcoin endpoint")
+                }
+        }
+    }
+    
+    // Currently, this method is not in use in the app
+    // It is automatically called in ViewDidLoad for testing purposes only because I only have a free account on their website
+    // This was just for my own enjoyment to give myself a challenge to make a request using a SHA256 encrypted header
+    func getBitcoinAuth(){
+        let time: Int = Int(NSDate().timeIntervalSince1970) // Creating Epoch timestamp (required by Bitcoin website)
+        let payload: String = String(time) + "." + publicKey // Payload required by Bitcoin website
+        let digestValue = payload.hmac(key: privateKey) // Digest value required by Bitcoin website
+        let xSig = payload + "." + digestValue // This string is the header required by the Bitcoin endpoint
+    
+        print(digestValue) // This is the header we have to supply with our GET request
+        
+        
+        Alamofire.request("https://apiv2.bitcoinaverage.com/indices/global/ticker/all?crypto=BTC&fiat=USD,EUR", method: .get, headers: ["X-signature": xSig])
+            .responseString { response in
+                
+                if response.result.isSuccess {
+                    // Do stuff with the data
+                    let bitcoinJSON : JSON = JSON(response.result.value!) // Create a JSON object from the result
                     print(bitcoinJSON)
-                    
-                    self.parseJSONData(json: bitcoinJSON) // Handle the JSON object
                 } else {
                     // We couldn't connect to the bitcoin endpoint
                     print("Error connecting to Bitcoin endpoint")
@@ -53,16 +80,17 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     }
     
     // MARK: - JSON Parsing
-    func parseJSONData(json: JSON) {
+    // If the JSON we received from the API call isn't nil then call the update UI method
+    func parseJSONData(json: JSON, symbol: Int) {
         if let price = json["ask"].double {
-            updateUI(price: price) // Send data to UI update method
+            updateUI(price: price, symbol: symbol) // Send data to UI update method
         }
     }
     
     
     // MARK: - Update UI Methods
-    func updateUI(price: Double){
-        priceLabel.text = String(price) // Update the label with the corresponding UI
+    func updateUI(price: Double, symbol: Int){
+        priceLabel.text = String(currencySymbolsArray[symbol]) + " " + String(price) // Update the label with the corresponding price
     }
     
     // MARK: - Picker View Delegate Methods
@@ -82,7 +110,18 @@ class ViewController: UIViewController, UIPickerViewDataSource, UIPickerViewDele
     func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
         finalURL = baseURL + currencyArray[row]
         
-        getBitcoinPrice(url: finalURL)
+        getBitcoinPrice(url: finalURL, symbol: row)
     }
 }
 
+// This extension allows me to encrypt a string with a key using SHA256
+// HOW TO USE:
+// stringToBeEncrypted.hmac(key: myKey)  => your encrypted string
+extension String {
+    func hmac(key: String) -> String {
+        var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
+        CCHmac(CCHmacAlgorithm(kCCHmacAlgSHA256), key, key.count, self, self.count, &digest)
+        let data = Data(bytes: digest)
+        return data.map { String(format: "%02hhx", $0) }.joined()
+    }
+}
